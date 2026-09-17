@@ -1,0 +1,51 @@
+name: AI Code Review on Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    # Only fire on PR comments (not plain issue comments) that start with /review
+    if: >
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/review')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+
+    steps:
+      - name: Acknowledge trigger
+        run: echo "Review requested by ${{ github.event.comment.user.login }} on PR #${{ github.event.issue.number }}"
+
+      - name: Checkout review tool
+        uses: actions/checkout@v4
+        with:
+          repository: Saikat-Ray/code-review-board
+          token: ${{ secrets.TOOL_REPO_PAT }}
+          path: code-review-board
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: code-review-board
+        run: pip install -r requirements.txt
+
+      - name: Run review pipeline
+        working-directory: code-review-board
+        env:
+          COMMENTER_LLM: ${{ secrets.COMMENTER_LLM }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python run_pipeline.py \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ github.event.repository.name }}" \
+            --pr "${{ github.event.issue.number }}"
