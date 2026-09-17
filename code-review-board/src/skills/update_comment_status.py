@@ -2,6 +2,9 @@
 Skill: update_comment_status
 
 Writes the moderator's per-comment verdicts back to pr_review_comments.
+Deliberately touches ONLY status and moderator_notes — the UPDATE
+statement has no way to reach the comment column, by construction, so
+the original agent-generated text is never mutated by moderation.
 """
 
 from typing import Any, Dict, List
@@ -18,6 +21,6 @@ def update_comment_status(verdicts: List[Dict[str, Any]]) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.executemany(
-                query, [(v["status"], v.get("notes", ""), v["id"]) for v in verdicts]
+                query, [(v["status"], v["notes"], v["id"]) for v in verdicts]
             )
         conn.commit()

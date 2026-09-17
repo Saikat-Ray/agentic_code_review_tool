@@ -28,7 +28,7 @@ improving error handling" with no specifics).
 Do NOT edit or rewrite any comment. Only approve or reject.
 
 Return ONLY a JSON array, no other text, in exactly this form:
-[{"id": <comment id as integer>, "status": "approved" | "rejected", "notes": "<one short sentence>"}]
+[{{"id": <comment id as integer>, "status": "approved" | "rejected", "notes": "<one short sentence>"}}]
 """
 
 _prompt = ChatPromptTemplate.from_messages(
@@ -39,10 +39,6 @@ _chain = _prompt | get_llm(max_tokens=1200)
 
 
 def moderate_comments(comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    comments: rows from pr_review_comments — each needs id, agent_name, comment.
-    Returns: [{"id": int, "status": "approved"|"rejected", "notes": str}, ...]
-    """
     if not comments:
         return []
 
@@ -52,17 +48,22 @@ def moderate_comments(comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     response = _chain.invoke({"comments_block": comments_block})
     raw = response.content.strip()
 
-    # Models sometimes wrap JSON in ```json fences despite instructions.
     if raw.startswith("```"):
         raw = raw.strip("`")
         if raw.startswith("json"):
             raw = raw[4:]
         raw = raw.strip()
 
-    verdicts = json.loads(raw)
+    parsed = json.loads(raw)
 
-    # Safety net: any comment the model didn't return a verdict for gets
-    # rejected rather than silently left pending forever.
+    # Only ever carry forward id/status/notes — even if the model ignores
+    # instructions and returns a "comment" field, it's dropped here before
+    # it reaches the DB layer.
+    verdicts = [
+        {"id": v["id"], "status": v["status"], "notes": v.get("notes", "")}
+        for v in parsed
+    ]
+
     returned_ids = {v["id"] for v in verdicts}
     for c in comments:
         if c["id"] not in returned_ids:
