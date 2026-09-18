@@ -20,6 +20,16 @@ jobs:
         working-directory: code-review-board
         run: pip install -r requirements.txt
 
+      - name: Check GitHub token
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_PAT }}
+        run: |
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "::error::TARGET_REPO_PAT is missing or unavailable"
+            exit 1
+          fi
+          echo "GitHub token is configured"
+
       - name: Run review pipeline
         working-directory: code-review-board
         env:
