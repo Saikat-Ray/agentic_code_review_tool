@@ -17,9 +17,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        working-directory: code-review-board
+        run: pip install -r src/requirements.txt
 
       - name: Run review pipeline
+        working-directory: code-review-board
         env:
           COMMENTER_LLM: ${{ secrets.COMMENTER_LLM }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
