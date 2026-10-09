@@ -181,6 +181,48 @@ The pipeline is composed of a few stages:
 
 This moderation stage is important because it helps catch duplicate or vague comments before they are sent to the PR.
 
+### LangGraph node flow
+
+The top-level LangGraph keeps the workflow linear. `generate_comments` wraps the existing review orchestrator, while `moderate_comments` evaluates the saved comments and posts the approved ones.
+
+```mermaid
+flowchart LR
+    START([START]) --> generate[generate_comments]
+
+    subgraph review[Review generation node]
+        fetch[fetch_pr_diff] --> filter[filter_reviewable_files]
+        filter --> panel[Reviewer panel]
+        panel --> correctness[CorrectnessAgent]
+        panel --> security[SecurityAgent]
+        panel --> style[StyleAgent]
+        correctness --> synth[SynthesizerAgent]
+        security --> synth
+        style --> synth
+        synth --> save[save_review_to_db]
+    end
+
+    generate --> fetch
+    save --> moderate[moderate_comments]
+    moderate --> approved{Comments approved?}
+    approved -->|Yes| post[post_review_comment]
+    approved -->|No| finish([END])
+    post --> finish
+
+    classDef graphNode fill:#e8f1ff,stroke:#3267a8,color:#102a43
+    classDef decision fill:#fff4d6,stroke:#b7791f,color:#4a3410
+    class generate,moderate graphNode
+    class approved decision
+```
+
+At the LangGraph level, the actual edges are:
+
+```mermaid
+flowchart LR
+    START([START]) --> generate_comments[generate_comments]
+    generate_comments --> moderate_comments[moderate_comments]
+    moderate_comments --> END([END])
+```
+
 ## Why the moderator exists
 
 The final comment set is not just the raw output of each reviewer. The moderator checks for:
